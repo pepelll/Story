@@ -1,10 +1,11 @@
 """Concept board: «отсутствие 10 месяцев» — prison bars in 5 sequential stills.
 
-01 ПОЯВЛЕНИЕ  a single bar rises into the empty pearl frame
-02 РОСТ       bars grow in a staggered rhythm; a giant «10» fades in behind
-03 РЕШЁТКА    the grid closes; «10 МЕСЯЦЕВ» is caged behind the bars
-04 ТЕНЬ       3/4 angle, hard side light: bar stripes fall across wall + words
-05 ФИНАЛ      close-up through soft foreground bars, sharp headline lock-up
+Layout: text in the top half only, bars only in the bottom half, no overlap.
+01 ПОЯВЛЕНИЕ  a single bar rises from the floor; lead word alone
+02 РОСТ       bars grow in a staggered rhythm; giant «10» above
+03 РЕШЁТКА    the riveted grid closes; «10 МЕСЯЦЕВ» headline
+04 ТЕНЬ       3/4 view, back light: bar shadows stretch toward camera
+05 ФИНАЛ      full-bleed row of bars along the bottom; final lock-up
 
 Usage: python bars_board.py RENDER_DIR OUT_DIR
 """
@@ -34,48 +35,56 @@ def lead(img, text, y, size=78, x=W / 2):
 
 
 frames = []
+# Layout rule: typography lives in the TOP zone (y < 900); the bar renders are
+# framed in-camera to stay in the BOTTOM half (y > 1000). Nothing crosses.
 
-# 01 — appearance
-img = background(11, cx=0.5, cy=0.45)
-img = lead(img, "отсутствие", 610)
-img = over(img, style.load_obj("b1.png"), dy=120)
+
+def big(img, text, cx, cy, size, anchor="c", grad=None, shadow=0.45):
+    m = mask()
+    place(m, text_mask(text, F("Black", size), -0.015), cx, cy, anchor)
+    return ink(img, m, CHAR, shadow=shadow, grad=grad)
+
+
+def lead_l(img, text, x, y, size=80):
+    m = mask()
+    place(m, text_mask(text, F("Light", size)), x, y, "l")
+    return ink(img, m, MID, shadow=0.22, sh_off=(4, 6), sh_blur=4)
+
+
+# 01 — appearance: one word, one bar
+img = background(11, cx=0.5, cy=0.35)
+img = lead(img, "отсутствие", 600, 104)
+img = over(img, style.load_obj("b1.png"))
 frames.append(("01", "ПОЯВЛЕНИЕ", finish(img, 11)))
 
-# 02 — growth, giant 10 behind
-img = background(12, cx=0.5, cy=0.45)
-img = lead(img, "отсутствие", 360)
-m = mask()
-place(m, text_mask("10", F("Black", 820), -0.04), W / 2 - 20, 900)
-img = ink(img, m, CHAR, shadow=0.0, grad=vfade(560, 1250, (0.12, 0.12, 0.13), (0.70, 0.70, 0.71)))
-img = over(img, style.load_obj("b2.png"), dy=120)
+# 02 — growth: a giant 10 above the rising bars
+img = background(12, cx=0.5, cy=0.35)
+img = lead(img, "отсутствие", 290, 84)
+img = big(img, "10", W / 2 - 15, 610, 560, grad=vfade(400, 840, (0.12, 0.12, 0.13), (0.55, 0.55, 0.56)), shadow=0.0)
+img = over(img, style.load_obj("b2.png"))
 frames.append(("02", "РОСТ", finish(img, 12)))
 
-# 03 — the grid closes over the words
-img = background(13, cx=0.5, cy=0.45)
-m = mask()
-place(m, text_mask("10 МЕСЯЦЕВ", F("Black", 196), -0.01), W / 2, 960)
-img = ink(img, m, CHAR, shadow=0.5)
-img = over(img, style.load_obj("b3.png"), dy=60)
-img = lead(img, "отсутствие", 300, 84)
+# 03 — the grid closes: full headline
+img = background(13, cx=0.5, cy=0.35)
+img = lead(img, "отсутствие", 430, 88)
+img = big(img, "10 МЕСЯЦЕВ", W / 2, 600, 200)
+cv2.line(img, (180, 735), (900, 722), (0.18, 0.18, 0.19), 3, cv2.LINE_AA)
+img = over(img, style.load_obj("b3.png"))
 frames.append(("03", "РЕШЁТКА", finish(img, 13)))
 
-# 04 — shadows: words on the wall, bar stripes fall across them
-img = background(14, cx=0.35, cy=0.40, base=0.84)
-img = lead(img, "отсутствие", 330, 84)
-m = mask()
-place(m, text_mask("10", F("Black", 330), -0.03), 300, 640)
-place(m, text_mask("МЕСЯЦЕВ", F("Black", 150), -0.01), 330, 850)
-img = ink(img, m, CHAR, shadow=0.35)
-img = over(img, style.load_obj("b4.png"), dx=160, dy=60)
+# 04 — shadow: left-aligned editorial stack, stripes run toward camera below
+img = background(14, cx=0.35, cy=0.35, base=0.84)
+img = lead_l(img, "отсутствие", 96, 300, 84)
+img = big(img, "10", 80, 520, 380, anchor="l")
+img = big(img, "МЕСЯЦЕВ", 88, 770, 170, anchor="l")
+img = over(img, style.load_obj("b4.png"))
 frames.append(("04", "ТЕНЬ", finish(img, 14)))
 
-# 05 — close-up through soft bars, final lock-up
-img = background(15, cx=0.5, cy=0.42, base=0.86)
-m = mask()
-place(m, text_mask("ОТСУТСТВИЕ", F("Black", 176), -0.01), W / 2, 900)
-img = ink(img, m, CHAR, shadow=0.5)
+# 05 — final lock-up over a full-bleed row of bars
+img = background(15, cx=0.5, cy=0.30, base=0.86)
+img = big(img, "ОТСУТСТВИЕ", W / 2, 470, 182)
 m2 = mask()
-place(m2, text_mask("10 месяцев", F("Light", 120)), W / 2, 1075)
+place(m2, text_mask("10 месяцев", F("Light", 128)), W / 2, 650)
 img = ink(img, m2, MID, shadow=0.3, sh_off=(5, 7), sh_blur=5)
 img = over(img, style.load_obj("b5.png"))
 frames.append(("05", "ФИНАЛ", finish(img, 15)))

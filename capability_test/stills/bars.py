@@ -96,48 +96,55 @@ def strip(name, loc, tgt, energy, w=0.5, h=6.0):
 
 
 # ------------------------------------------------------------------ stages
-if STAGE == 1:      # a single bar rises into the empty frame
-    bar(0.0, 2.6)
+# Layout rule: bars live ONLY in the lower half of the 9:16 frame; the top
+# half is reserved for typography. Cameras stay level (no keystoning) and use
+# lens shift to push the subject down.
+def frame_low(cam, shift):
+    cam.data.shift_y = shift
+
+
+if STAGE in (1, 2, 3):  # same locked frontal camera for the first three beats
+    if STAGE == 1:      # a single bar rises from the floor
+        bar(0.0, 1.9)
+    elif STAGE == 2:    # bars grow in a staggered rhythm
+        for x, h in zip(X, [1.2, 2.3, 3.4, 4.4, 3.1, 2.0, 1.0]):
+            bar(x, h)
+    else:               # the grid closes: full door with straps + rivets
+        for x in X:
+            bar(x, HGT)
+        for z in (0.55, 2.7, 4.75):
+            strap(z)
     catcher_floor()
-    cam = C.camera((0, 9.5, 2.3), (0, 0, 2.3), lens=50, fstop=None)
-elif STAGE == 2:    # bars grow in a staggered rhythm
-    hs = [1.6, 2.8, 3.9, 4.6, 3.6, 2.4, 1.3]
-    for x, h in zip(X, hs):
-        bar(x, h)
-    catcher_floor()
-    cam = C.camera((0, 9.5, 2.5), (0, 0, 2.5), lens=50, fstop=None)
-elif STAGE == 3:    # the grid closes: full door, frontal
+    cam = C.camera((0, 18.5, 2.6), (0, 0, 2.6), lens=50, fstop=None)
+    frame_low(cam, 0.25)
+elif STAGE == 4:        # 3/4 view, back light: long bar shadows run toward camera
     for x in X:
         bar(x, HGT)
     for z in (0.55, 2.7, 4.75):
         strap(z)
     catcher_floor()
-    cam = C.camera((0, 9.5, 2.6), (0, 0, 2.6), lens=50, fstop=None)
-elif STAGE == 4:    # 3/4 view, hard side light, striped shadows on the wall
-    for x in X:
-        bar(x, HGT)
+    cam = C.camera((7.0, 20.0, 7.0), (0.6, 0, 2.6), lens=50, fstop=None)
+    cam.rotation_euler.x = math.radians(80)  # slight look-down shows the floor stripes
+    frame_low(cam, 0.17)
+elif STAGE == 5:        # wide bleed of bars along the bottom edge, cropped by frame
+    N5 = 13
+    for i in range(N5):
+        bar((i - (N5 - 1) / 2) * SP, HGT)
     for z in (0.55, 2.7, 4.75):
-        strap(z)
+        strap(z, (N5 - 1) * SP + 0.5)
     catcher_floor()
-    catcher_wall(-1.6)
-    cam = C.camera((4.2, 8.6, 2.2), (0.2, -0.6, 2.4), lens=48, fstop=None)
-elif STAGE == 5:    # close-up through the bars, foreground soft, focus beyond
-    for x in X:
-        bar(x, HGT)
-    for z in (0.55, 2.7, 4.75):
-        strap(z)
-    catcher_floor()
-    cam = C.camera((0.23, 2.7, 3.6), (0.23, -6, 3.5), lens=35, fstop=1.4, focus=12.0)
+    cam = C.camera((0, 9.0, 3.0), (0, 0, 3.0), lens=35, fstop=None)
+    frame_low(cam, 0.33)
 
 # lights: soft key + strip highlights so the round bars read as polished tubes
 if STAGE == 4:
     sun = bpy.data.lights.new("Sun", "SUN")
-    sun.energy = 6.0
-    sun.angle = math.radians(1.2)  # crisp but not CG-hard shadow edges
+    sun.energy = 5.0
+    sun.angle = math.radians(1.5)
     so = C.link(bpy.data.objects.new("Sun", sun))
-    so.location = (6.0, 4.0, 4.0)
-    C.aim(so, (0, -1.6, 2.2))  # rakes front-right -> back-left: bar stripes land on the wall
-    C.area_light("Fill", (2, 8, 3), ("aim", (0, 0, 2.5)), 6, 150)
+    so.location = (-2.0, -9.0, 6.5)
+    C.aim(so, (0.5, 0, 0))  # from behind-left: stripes stretch forward-right
+    C.area_light("Fill", (3, 10, 4), ("aim", (0, 0, 2.5)), 8, 260)
 else:
     C.area_light("Key", (-3, 6, 7), ("aim", (0, 0, 2.5)), 4.0, 700)
     C.area_light("Fill", (4, 7, 2), ("aim", (0, 0, 2.5)), 5.0, 160)
