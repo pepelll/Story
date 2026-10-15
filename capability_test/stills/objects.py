@@ -171,12 +171,13 @@ elif OBJ == "coins":
     tcu.align_x = tcu.align_y = "CENTER"
     g = C.link(bpy.data.objects.new("Glyph", tcu))
     g.location = (0, 0, T - 0.012)
+    g.rotation_euler = (0, 0, math.pi)  # glyph upright when the coin tips toward camera
     bpy.context.view_layer.objects.active = g
     g.select_set(True)
     bpy.ops.object.convert(target="MESH")
     g = bpy.context.active_object
     g.data.materials.clear()
-    g.data.materials.append(chrome)
+    g.data.materials.append(graphite)
     master.select_set(True)
     bpy.context.view_layer.objects.active = master
     bpy.ops.object.join()
@@ -189,7 +190,7 @@ elif OBJ == "coins":
         o.rotation_euler = (0, 0, random.uniform(0, 6.28))
     hero = C.link(bpy.data.objects.new("Hero", master.data))  # coin landing on the stack, on edge
     hero.location = (0.05, 0.02, 9 * T + 0.55)
-    hero.rotation_euler = (math.radians(-74), math.radians(10), math.radians(14))
+    hero.rotation_euler = (math.radians(-62), math.radians(8), math.radians(10))
     master.hide_render = True
     catcher()
     cam = C.camera((0.0, 3.3, 0.55), (0.0, 0, 0.78), lens=55, fstop=None)
