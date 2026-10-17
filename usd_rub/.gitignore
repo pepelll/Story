@@ -4,3 +4,4 @@ audio/*.npy
 audio/*.png
 audio/clicks_ref.wav
 render.log
+out/*.mov
