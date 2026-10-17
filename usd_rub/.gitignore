@@ -1,0 +1,6 @@
+node_modules/
+preview/
+audio/*.npy
+audio/*.png
+audio/clicks_ref.wav
+render.log
