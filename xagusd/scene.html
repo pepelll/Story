@@ -1,0 +1,669 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>XAGUSD</title>
+<style>
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// Сцена XAG/USD 3.5 с, 1440×1080. Всё рисуется функцией drawScene(t); render.cjs вызывает window.renderFrame(t).
+const W = 1440, H = 1080;
+const CFG = {
+  ticker: 'XAG/USD',
+  subtitle: 'Silver Spot · 1D',
+  prevClose: 57.006,        // для % изменения: 57.20 → +0.34 %
+  price: 57.20,             // текущая цена
+  // три большие свечи: [open, close, high, low], старт роста, длительность
+  big: [
+    { c: 168.40, h: 176.10, l: 55.90, t0: 1.10, d: 0.42 },
+    { c: 341.80, h: 354.60, l: 162.30, t0: 1.66, d: 0.42 },
+    { c: 527.40, h: 541.20, l: 333.50, t0: 2.20, d: 0.50 },
+  ],
+  views: [210, 400, 600],   // верх шкалы после каждой большой свечи
+  finale: 2.80,
+};
+
+const cv = document.getElementById('c');
+cv.width = W; cv.height = H;
+const out = cv.getContext('2d');
+const fb = document.createElement('canvas'); fb.width = W; fb.height = H;
+const ctx = fb.getContext('2d');
+
+// ---------- утилиты ----------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const prog = (t, t0, d) => clamp((t - t0) / d);
+const eOutCubic = x => 1 - Math.pow(1 - x, 3);
+const eOutQuart = x => 1 - Math.pow(1 - x, 4);
+const eOutQuint = x => 1 - Math.pow(1 - x, 5);
+const eOutExpo = x => x >= 1 ? 1 : 1 - Math.pow(2, -10 * x);
+const eInOutCubic = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eOutBack = (x, s = 1.70158) => 1 + (s + 1) * Math.pow(x - 1, 3) + s * Math.pow(x - 1, 2);
+function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+const FONT = '"Inter Display", "Inter", sans-serif';
+
+function rrect(c, x, y, w, h, r) {
+  r = Math.max(0, Math.min(r, w / 2, Math.abs(h) / 2));
+  c.beginPath(); c.roundRect(x, y, w, h, r);
+}
+
+// ---------- данные истории ----------
+const HIST = (() => {
+  const r = rng(7), n = 24, arr = [];
+  let p = 50.2;
+  const raw = [];
+  for (let i = 0; i < n; i++) {
+    const o = p;
+    const drift = 0.32 + Math.sin(i * 0.7) * 0.9;
+    const c = o + drift + (r() - 0.5) * 3.2;
+    raw.push([o, c]); p = c;
+  }
+  // подгоняем, чтобы последний close = текущая цена
+  const k = (CFG.price - raw[0][0]) / (raw[n - 1][1] - raw[0][0]);
+  for (let i = 0; i < n; i++) {
+    const o = raw[0][0] + (raw[i][0] - raw[0][0]) * k;
+    const c = raw[0][0] + (raw[i][1] - raw[0][0]) * k;
+    const h = Math.max(o, c) + 0.3 + r() * 1.4;
+    const l = Math.min(o, c) - 0.3 - r() * 1.4;
+    arr.push({ o, c, h, l });
+  }
+  return arr;
+})();
+
+// ---------- геометрия ----------
+const CH = { x0: 70, x1: 1282, y0: 196, y1: 772 };
+const histX = i => 112 + i * 30, HIST_W = 16;
+const BIG_X = [886, 1010, 1138], BIG_W = 78;
+
+// ---------- состояние графика во времени ----------
+function bigState(k, t) {
+  const b = CFG.big[k];
+  const o = k === 0 ? CFG.price : CFG.big[k - 1].c;
+  const p = prog(t, b.t0, b.d);
+  const body = eOutQuart(p);
+  const wick = eOutQuart(prog(t, b.t0 - 0.03, b.d));
+  return { o, c: lerp(o, b.c, body), h: lerp(o, b.h, wick), l: lerp(o, b.l, eOutCubic(p)), p, on: t >= b.t0 - 0.03 };
+}
+
+// шкала: голова растущей свечи «тянет» верх шкалы, потом шкала выдыхает до фиксированного уровня
+function view(t) {
+  const vmin = lerp(44, 0, eInOutCubic(prog(t, CFG.big[0].t0 - 0.05, 0.62)));
+  let vmax = 64;
+  for (let k = 0; k < 3; k++) {
+    const b = CFG.big[k];
+    if (t < b.t0) break;
+    const prevTop = vmax;
+    const s = bigState(k, t);
+    const fracStart = (s.o - vmin) / (prevTop - vmin);
+    const fracEnd = (b.h - vmin) / (CFG.views[k] - vmin);
+    const pg = prog(t, b.t0, b.d);
+    const settle = eInOutCubic(prog(t, b.t0 + b.d * 0.75, 0.38));
+    const fracPeak = 0.95;
+    let frac = lerp(fracStart, fracPeak, eOutCubic(pg));
+    frac = lerp(frac, fracEnd, settle);
+    const head = settle > 0 ? lerp(s.h, b.h, settle) : s.h;
+    vmax = Math.max(prevTop, vmin + (head - vmin) / frac);
+  }
+  return { vmin, vmax };
+}
+
+function currentPrice(t) {
+  let p = CFG.price;
+  for (let k = 0; k < 3; k++) if (t >= CFG.big[k].t0) p = bigState(k, t).c;
+  return p;
+}
+
+// ---------- шум зерна ----------
+const grain = (() => {
+  const g = document.createElement('canvas'); g.width = 512; g.height = 512;
+  const gc = g.getContext('2d'), id = gc.createImageData(512, 512), r = rng(3);
+  for (let i = 0; i < id.data.length; i += 4) {
+    const v = r() * 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255;
+  }
+  gc.putImageData(id, 0, 0); return g;
+})();
+
+// ---------- слои ----------
+function drawBackground(t, glow) {
+  const c = ctx;
+  c.fillStyle = '#030201'; c.fillRect(0, 0, W, H);
+  const intro = eOutCubic(prog(t, 0, 0.6));
+  // основной тёплый свет за графиком, усиливается с ростом цены
+  let g = c.createRadialGradient(980, 360, 0, 980, 360, 900);
+  const a = (0.10 + 0.13 * glow) * intro;
+  g.addColorStop(0, `rgba(255,176,20,${a})`);
+  g.addColorStop(0.45, `rgba(170,90,0,${a * 0.35})`);
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  // подсветка снизу под слитками
+  g = c.createRadialGradient(720, 1010, 0, 720, 1010, 620);
+  const b = 0.12 * eOutCubic(prog(t, 0.45, 0.8)) + 0.05 * glow;
+  g.addColorStop(0, `rgba(255,190,50,${b})`);
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  // диагональный отблеск
+  g = c.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, `rgba(255,210,90,${0.04 * intro})`);
+  g.addColorStop(0.5, 'rgba(0,0,0,0)');
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+}
+
+function yOf(p, v) { return CH.y1 - (p - v.vmin) / (v.vmax - v.vmin) * (CH.y1 - CH.y0); }
+
+function niceTicks(v) {
+  // плавная смена шага сетки: каждый «красивый» шаг получает альфу по плотности линий
+  const range = v.vmax - v.vmin, res = new Map();
+  const steps = [2.5, 5, 10, 25, 50, 100, 250];
+  for (const s of steps) {
+    const n = range / s;
+    const a = clamp(1 - Math.abs(Math.log2(n / 4.6)) * 1.4);
+    if (a <= 0.001) continue;
+    for (let p = Math.ceil(v.vmin / s) * s; p <= v.vmax + 1e-6; p += s) {
+      const key = Math.round(p * 100);
+      const cur = res.get(key); if (!cur || cur.a < a) res.set(key, { a, s });
+    }
+  }
+  return [...res.entries()].map(([k, o]) => ({ p: k / 100, a: o.a, s: o.s }));
+}
+
+function drawGrid(t, v, tagY) {
+  const c = ctx;
+  const reveal = eOutQuint(prog(t, 0.05, 0.75));
+  c.save();
+  c.beginPath(); c.rect(0, 0, lerp(CH.x0, W, reveal), H); c.clip();
+  // вертикальные линии
+  for (let x = CH.x0 + 60; x < CH.x1; x += 120) {
+    c.fillStyle = 'rgba(255,205,90,0.035)'; c.fillRect(x, CH.y0 - 20, 1, CH.y1 - CH.y0 + 20);
+  }
+  c.font = `500 19px ${FONT}`; c.textBaseline = 'middle'; c.textAlign = 'left';
+  for (const { p, a, s } of niceTicks(v)) {
+    const y = yOf(p, v);
+    if (y < CH.y0 - 30 || y > CH.y1 + 1) continue;
+    const edge = clamp((y - (CH.y0 - 30)) / 40);
+    const g = c.createLinearGradient(CH.x0, 0, CH.x1, 0);
+    g.addColorStop(0, 'rgba(255,205,90,0)');
+    g.addColorStop(0.15, `rgba(255,205,90,${0.085 * a * edge})`);
+    g.addColorStop(1, `rgba(255,205,90,${0.12 * a * edge})`);
+    c.fillStyle = g; c.fillRect(CH.x0, Math.round(y), CH.x1 - CH.x0, 1);
+    const near = clamp((Math.abs(y - tagY) - 18) / 14);
+    c.fillStyle = `rgba(255,214,120,${0.55 * a * edge * near})`;
+    const lbl = s < 10 ? p.toFixed(2) : p.toFixed(0);
+    c.fillText(lbl, CH.x1 + 22, y);
+  }
+  // базовая линия
+  const g = c.createLinearGradient(CH.x0, 0, CH.x1, 0);
+  g.addColorStop(0, 'rgba(255,200,60,0)'); g.addColorStop(0.2, 'rgba(255,200,60,0.35)'); g.addColorStop(1, 'rgba(255,200,60,0.5)');
+  c.fillStyle = g; c.fillRect(CH.x0, CH.y1, CH.x1 - CH.x0, 1.5);
+  c.restore();
+}
+
+function candleBody(c, x, w, yo, yc, yh, yl, bull, alpha, glow, r) {
+  const top = Math.min(yo, yc), hgt = Math.max(Math.abs(yc - yo), 3);
+  c.save();
+  c.globalAlpha = alpha;
+  // фитиль
+  const ww = Math.max(2.5, w * 0.11);
+  const wg = c.createLinearGradient(0, yh, 0, yl);
+  wg.addColorStop(0, bull ? '#FFE9A0' : 'rgba(255,200,70,0.55)');
+  wg.addColorStop(1, bull ? '#E79A00' : 'rgba(200,130,20,0.45)');
+  c.fillStyle = wg;
+  rrect(c, x - ww / 2, yh, ww, yl - yh, ww / 2); c.fill();
+  if (bull) {
+    if (glow > 0) {
+      c.save();
+      c.shadowColor = `rgba(255,190,30,${0.9 * glow})`; c.shadowBlur = 18 + 40 * glow;
+      c.fillStyle = '#FFC21A'; rrect(c, x - w / 2, top, w, hgt, r); c.fill();
+      c.restore();
+    }
+    const g = c.createLinearGradient(0, top, 0, top + hgt);
+    g.addColorStop(0, '#FFF1B8'); g.addColorStop(0.18, '#FFD43B'); g.addColorStop(0.65, '#F5A800'); g.addColorStop(1, '#B86E00');
+    c.fillStyle = g; rrect(c, x - w / 2, top, w, hgt, r); c.fill();
+    // горизонтальный объём + блик слева
+    const hg = c.createLinearGradient(x - w / 2, 0, x + w / 2, 0);
+    hg.addColorStop(0, 'rgba(255,255,255,0.0)'); hg.addColorStop(0.22, 'rgba(255,255,255,0.35)');
+    hg.addColorStop(0.4, 'rgba(255,255,255,0.0)'); hg.addColorStop(1, 'rgba(90,40,0,0.28)');
+    c.fillStyle = hg; rrect(c, x - w / 2, top, w, hgt, r); c.fill();
+    c.strokeStyle = 'rgba(255,245,200,0.6)'; c.lineWidth = 1;
+    rrect(c, x - w / 2 + 0.5, top + 0.5, w - 1, hgt - 1, r); c.stroke();
+  } else {
+    c.fillStyle = 'rgba(30,20,5,0.9)'; rrect(c, x - w / 2, top, w, hgt, r); c.fill();
+    c.strokeStyle = 'rgba(255,196,50,0.75)'; c.lineWidth = 1.6;
+    rrect(c, x - w / 2 + 0.8, top + 0.8, w - 1.6, hgt - 1.6, r); c.stroke();
+  }
+  c.restore();
+}
+
+function drawHistory(t, v) {
+  const c = ctx;
+  HIST.forEach((d, i) => {
+    const t0 = 0.24 + i * 0.026;
+    const p = prog(t, t0, 0.32);
+    if (p <= 0) return;
+    const s = eOutBack(p, 1.6);
+    const mid = (d.o + d.c) / 2;
+    const k = s;
+    const o = lerp(mid, d.o, k), cl = lerp(mid, d.c, k), h = lerp(mid, d.h, k), l = lerp(mid, d.l, k);
+    const x = histX(i);
+    candleBody(c, x, HIST_W, yOf(o, v), yOf(cl, v), yOf(h, v), yOf(l, v), d.c >= d.o, clamp(p * 2.5), 0.25, 4);
+  });
+}
+
+function drawBig(t, v) {
+  const c = ctx;
+  for (let k = 0; k < 3; k++) {
+    const s = bigState(k, t);
+    if (!s.on) continue;
+    const b = CFG.big[k];
+    const x = BIG_X[k];
+    const appear = eOutCubic(prog(t, b.t0 - 0.03, 0.12));
+    const w = BIG_W * lerp(0.4, 1, eOutBack(prog(t, b.t0 - 0.03, 0.28), 2.2));
+    const pulse = Math.exp(-Math.max(0, t - (b.t0 + b.d * 0.55)) * 3.5) * (t > b.t0 ? 1 : 0);
+    const fin = eOutCubic(prog(t, CFG.finale, 0.3)) * (k === 2 ? 1 : 0.5);
+    const glow = clamp(0.45 + 0.55 * pulse + 0.35 * fin);
+    // объёмное свечение позади свечи (размытая копия)
+    const yo = yOf(s.o, v), yc = yOf(s.c, v);
+    c.save();
+    c.filter = 'blur(38px)';
+    c.globalAlpha = 0.55 * glow * appear;
+    c.fillStyle = '#FFB000';
+    rrect(c, x - w * 0.8, yc - 10, w * 1.6, yo - yc + 20, 30); c.fill();
+    c.restore();
+    candleBody(c, x, w, yo, yc, yOf(s.h, v), yOf(s.l, v), true, appear, glow, 14);
+  }
+}
+
+function drawSparks(t, v) {
+  const c = ctx;
+  c.save(); c.globalCompositeOperation = 'lighter';
+  for (let k = 0; k < 3; k++) {
+    const b = CFG.big[k];
+    const r = rng(100 + k);
+    const s = bigState(k, t);
+    const hx = BIG_X[k], hy = yOf(s.c, v);
+    for (let i = 0; i < 46; i++) {
+      const te = b.t0 + r() * b.d * 0.9;
+      const life = 0.35 + r() * 0.45;
+      const ang = -Math.PI / 2 + (r() - 0.5) * 2.4;
+      const sp = 160 + r() * 420;
+      const size = 1.2 + r() * 2.6;
+      const ox = (r() - 0.5) * BIG_W;
+      const age = t - te;
+      if (age < 0 || age > life) continue;
+      const q = age / life;
+      const x = hx + ox + Math.cos(ang) * sp * age;
+      const y = hy + Math.sin(ang) * sp * age + 520 * age * age;
+      const a = (1 - q) * (1 - q);
+      c.fillStyle = `rgba(255,${190 + 50 * (1 - q) | 0},${60 + 120 * (1 - q) | 0},${a})`;
+      c.beginPath(); c.arc(x, y, size * (1 - q * 0.5), 0, Math.PI * 2); c.fill();
+    }
+  }
+  // искры финала вокруг верха третьей свечи
+  const r = rng(999);
+  const s3 = bigState(2, t);
+  const fx = BIG_X[2], fy = yOf(s3.c, v);
+  for (let i = 0; i < 60; i++) {
+    const te = CFG.finale + r() * 0.12, life = 0.5 + r() * 0.5;
+    const ang = r() * Math.PI * 2, sp = 120 + r() * 380, size = 1 + r() * 2.4;
+    const age = t - te; if (age < 0 || age > life) continue;
+    const q = age / life;
+    const d = sp * (1 - Math.exp(-age * 5)) / 5 * 4;
+    const x = fx + Math.cos(ang) * d, y = fy + Math.sin(ang) * d * 0.8 + 80 * age * age;
+    c.fillStyle = `rgba(255,220,120,${(1 - q) ** 1.5})`;
+    c.beginPath(); c.arc(x, y, size, 0, Math.PI * 2); c.fill();
+  }
+  c.restore();
+}
+
+function drawFlashes(t, v) {
+  const c = ctx;
+  c.save(); c.globalCompositeOperation = 'lighter';
+  for (let k = 0; k < 3; k++) {
+    const b = CFG.big[k];
+    const ti = b.t0 + b.d * 0.55;
+    const age = t - ti;
+    if (age < -0.05 || age > 0.7) continue;
+    const s = bigState(k, t);
+    const x = BIG_X[k], y = yOf(s.h, v);
+    const a = age < 0 ? (age + 0.05) / 0.05 : Math.exp(-age * 6);
+    const R = 60 + 260 * eOutCubic(clamp(age / 0.5));
+    let g = c.createRadialGradient(x, y, 0, x, y, R);
+    g.addColorStop(0, `rgba(255,236,170,${0.55 * a})`);
+    g.addColorStop(0.3, `rgba(255,180,30,${0.22 * a})`);
+    g.addColorStop(1, 'rgba(255,150,0,0)');
+    c.fillStyle = g; c.fillRect(x - R, y - R, R * 2, R * 2);
+    // кольцо-волна
+    if (age > 0) {
+      const rr = 20 + 220 * eOutQuart(clamp(age / 0.6));
+      c.strokeStyle = `rgba(255,214,110,${0.6 * (1 - clamp(age / 0.6))})`;
+      c.lineWidth = 3 * (1 - clamp(age / 0.6)) + 0.5;
+      c.beginPath(); c.ellipse(x, y, rr, rr * 0.55, 0, 0, Math.PI * 2); c.stroke();
+    }
+    // горизонтальный анаморфный блик
+    g = c.createLinearGradient(x - 420, 0, x + 420, 0);
+    g.addColorStop(0, 'rgba(255,200,60,0)'); g.addColorStop(0.5, `rgba(255,235,170,${0.5 * a})`); g.addColorStop(1, 'rgba(255,200,60,0)');
+    c.fillStyle = g; c.fillRect(x - 420, y - 1.5, 840, 3);
+  }
+  // финальная вспышка
+  const age = t - CFG.finale;
+  if (age > -0.05) {
+    const s = bigState(2, t);
+    const x = BIG_X[2], y = yOf(s.c, v);
+    const a = age < 0 ? (age + 0.05) / 0.05 : 0.35 + 0.65 * Math.exp(-age * 5);
+    for (let j = 0; j < 2; j++) {
+      const aj = clamp((age - j * 0.12) / 0.7);
+      if (age - j * 0.12 < 0) continue;
+      const rr = 30 + 230 * eOutQuart(aj);
+      c.strokeStyle = `rgba(255,214,110,${0.55 * (1 - aj)})`; c.lineWidth = 2;
+      c.beginPath(); c.arc(x, y, rr, 0, Math.PI * 2); c.stroke();
+    }
+    const g = c.createRadialGradient(x, y, 0, x, y, 200);
+    g.addColorStop(0, `rgba(255,236,170,${0.35 * a})`); g.addColorStop(1, 'rgba(255,170,0,0)');
+    c.fillStyle = g; c.fillRect(x - 200, y - 200, 400, 400);
+  }
+  c.restore();
+}
+
+function fmtPrice(p) { return p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+// моноширинные цифры: каждая цифра в слоте ширины «0»
+function drawTabular(c, str, x, y, align) {
+  const dw = c.measureText('0').width;
+  const widths = [...str].map(ch => /[0-9]/.test(ch) ? dw : c.measureText(ch).width);
+  const total = widths.reduce((a, b) => a + b, 0);
+  let cx = align === 'right' ? x - total : align === 'center' ? x - total / 2 : x;
+  const ta = c.textAlign; c.textAlign = 'center';
+  [...str].forEach((ch, i) => { c.fillText(ch, cx + widths[i] / 2, y); cx += widths[i]; });
+  c.textAlign = ta;
+  return total;
+}
+
+function drawPriceLine(t, v) {
+  const c = ctx;
+  const p = currentPrice(t);
+  const y = yOf(p, v);
+  const a = eOutCubic(prog(t, 0.85, 0.35));
+  if (a <= 0) return y;
+  // x последней свечи
+  let lx = histX(HIST.length - 1);
+  for (let k = 0; k < 3; k++) if (bigState(k, t).on) lx = BIG_X[k];
+  c.save();
+  c.globalAlpha = a;
+  c.strokeStyle = 'rgba(255,205,80,0.6)'; c.setLineDash([4, 7]); c.lineWidth = 1.2;
+  c.lineDashOffset = -t * 40;
+  c.beginPath(); c.moveTo(lerp(CH.x1, CH.x0, eOutCubic(prog(t, 0.85, 0.5))), y + 0.5); c.lineTo(CH.x1 + 8, y + 0.5); c.stroke();
+  c.setLineDash([]);
+  // пульсирующая точка
+  const ph = (t * 1.6) % 1;
+  c.globalCompositeOperation = 'lighter';
+  c.fillStyle = `rgba(255,200,60,${0.5 * (1 - ph)})`;
+  c.beginPath(); c.arc(lx, y, 6 + 18 * ph, 0, Math.PI * 2); c.fill();
+  c.globalCompositeOperation = 'source-over';
+  c.shadowColor = 'rgba(255,200,40,1)'; c.shadowBlur = 16;
+  c.fillStyle = '#FFF0B0'; c.beginPath(); c.arc(lx, y, 5, 0, Math.PI * 2); c.fill();
+  c.shadowBlur = 0;
+  // тег цены справа
+  c.font = `700 21px ${FONT}`;
+  const txt = fmtPrice(p);
+  const tw = Math.max(92, c.measureText(txt).width + 26);
+  const tx = CH.x1 + 10, th = 36;
+  const flash = CFG.big.reduce((m, b) => Math.max(m, Math.exp(-Math.max(0, t - (b.t0 + b.d * 0.55)) * 5) * (t > b.t0 + b.d * 0.55 ? 1 : 0)), 0);
+  c.shadowColor = `rgba(255,190,30,${0.6 + 0.4 * flash})`; c.shadowBlur = 16 + 26 * flash;
+  const g = c.createLinearGradient(0, y - th / 2, 0, y + th / 2);
+  g.addColorStop(0, '#FFE58A'); g.addColorStop(1, '#F2A900');
+  c.fillStyle = g; rrect(c, tx, y - th / 2, tw, th, 10); c.fill();
+  c.shadowBlur = 0;
+  c.fillStyle = '#120C02'; c.textBaseline = 'middle';
+  drawTabular(c, txt, tx + tw / 2, y + 1, 'center');
+  c.restore();
+  return y;
+}
+
+function drawHeader(t) {
+  const c = ctx;
+  const a1 = eOutCubic(prog(t, 0.08, 0.5));
+  const a2 = eOutCubic(prog(t, 0.16, 0.5));
+  // иконка Ag
+  c.save();
+  c.globalAlpha = a1;
+  const ix = 98, iy = 96, s = eOutBack(prog(t, 0.08, 0.45), 2);
+  c.translate(ix, iy); c.scale(s, s); c.rotate((1 - s) * -1.2);
+  let g = c.createLinearGradient(-30, -30, 30, 30);
+  g.addColorStop(0, '#FFF0B0'); g.addColorStop(0.5, '#FFC21A'); g.addColorStop(1, '#B36B00');
+  c.shadowColor = 'rgba(255,190,30,0.6)'; c.shadowBlur = 24;
+  c.fillStyle = g; c.beginPath(); c.arc(0, 0, 30, 0, Math.PI * 2); c.fill();
+  c.shadowBlur = 0;
+  c.fillStyle = '#0B0702'; c.beginPath(); c.arc(0, 0, 26.5, 0, Math.PI * 2); c.fill();
+  c.fillStyle = g; c.font = `700 24px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText('Ag', 0, 1.5);
+  c.restore();
+  // тикер
+  c.save();
+  c.globalAlpha = a1;
+  c.filter = `blur(${(1 - a1) * 10}px)`;
+  c.textBaseline = 'alphabetic'; c.textAlign = 'left';
+  c.font = `700 46px ${FONT}`;
+  g = c.createLinearGradient(0, 60, 0, 112);
+  g.addColorStop(0, '#FFF3C8'); g.addColorStop(1, '#FFC93A');
+  c.fillStyle = g;
+  c.fillText(CFG.ticker, 146 + (1 - a1) * -30, 100);
+  c.restore();
+  c.save();
+  c.globalAlpha = a2 * 0.6;
+  c.font = `500 20px ${FONT}`; c.fillStyle = '#FFD670';
+  c.fillText(CFG.subtitle, 148 + (1 - a2) * -30, 130);
+  c.restore();
+
+  // цена справа
+  const p = currentPrice(t);
+  const pct = (p / CFG.prevClose - 1) * 100;
+  const a3 = eOutCubic(prog(t, 0.2, 0.5));
+  const grow = CFG.big.reduce((m, b) => Math.max(m, Math.sin(Math.PI * prog(t, b.t0, b.d + 0.15))), 0);
+  c.save();
+  c.globalAlpha = a3;
+  c.filter = `blur(${(1 - a3) * 10}px)`;
+  c.translate(1370, 102 + (1 - a3) * 18);
+  const sc = 1 + 0.05 * grow;
+  c.scale(sc, sc);
+  c.font = `700 62px ${FONT}`; c.textBaseline = 'alphabetic';
+  g = c.createLinearGradient(0, -50, 0, 6);
+  g.addColorStop(0, '#FFF6D6'); g.addColorStop(1, '#FFC21A');
+  c.fillStyle = g;
+  c.shadowColor = `rgba(255,190,30,${0.25 + 0.5 * grow})`; c.shadowBlur = 20 + 30 * grow;
+  drawTabular(c, '$' + fmtPrice(p), 0, 0, 'right');
+  c.restore();
+  // плашка %
+  c.save();
+  const a4 = eOutBack(prog(t, 0.32, 0.45), 1.8);
+  c.globalAlpha = clamp(a4);
+  c.font = `700 21px ${FONT}`;
+  const ptxt = '▲ +' + (pct < 10 ? pct.toFixed(2) : pct.toFixed(1)) + '%';
+  const pw = c.measureText(ptxt).width + 28;
+  const fin = eOutBack(prog(t, CFG.finale, 0.4), 3);
+  const bump = 1 + 0.12 * Math.sin(Math.PI * clamp(fin));
+  c.translate(1370 - pw / 2, 140); c.scale(a4 * bump, a4 * bump);
+  g = c.createLinearGradient(0, -17, 0, 17);
+  g.addColorStop(0, '#FFE58A'); g.addColorStop(1, '#F2A900');
+  c.shadowColor = 'rgba(255,190,30,0.7)'; c.shadowBlur = 10 + 30 * grow + 20 * clamp(fin);
+  c.fillStyle = g; rrect(c, -pw / 2, -17, pw, 34, 17); c.fill();
+  c.shadowBlur = 0;
+  c.fillStyle = '#140D02'; c.textBaseline = 'middle';
+  drawTabular(c, ptxt, 0, 1, 'center');
+  c.restore();
+}
+
+// ---------- слитки ----------
+const BARS = [
+  { cx: 612, base: 1032, t0: 0.50 },
+  { cx: 828, base: 1032, t0: 0.62 },
+  { cx: 720, base: 966, t0: 0.76 },
+];
+function drawBar(c, cx, base, light, shine, k) {
+  const fw = 196, ftw = 160, fh = 52, depth = 14, tw = 128;
+  const yTop = base - fh;
+  // тень на полу
+  c.save();
+  let g = c.createRadialGradient(cx, base + 4, 0, cx, base + 4, 140);
+  g.addColorStop(0, 'rgba(0,0,0,0.55)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  c.fillStyle = g; c.fillRect(cx - 140, base - 20, 280, 40);
+  c.restore();
+  // верхняя грань
+  c.beginPath();
+  c.moveTo(cx - ftw / 2, yTop); c.lineTo(cx + ftw / 2, yTop);
+  c.lineTo(cx + tw / 2, yTop - depth); c.lineTo(cx - tw / 2, yTop - depth); c.closePath();
+  g = c.createLinearGradient(0, yTop - depth, 0, yTop);
+  g.addColorStop(0, '#FBFBFC'); g.addColorStop(1, '#C9CDD4');
+  c.fillStyle = g; c.fill();
+  // передняя грань
+  c.beginPath();
+  c.moveTo(cx - fw / 2 + 6, base); c.quadraticCurveTo(cx - fw / 2, base, cx - fw / 2 + 2, base - 6);
+  c.lineTo(cx - ftw / 2, yTop); c.lineTo(cx + ftw / 2, yTop);
+  c.lineTo(cx + fw / 2 - 2, base - 6); c.quadraticCurveTo(cx + fw / 2, base, cx + fw / 2 - 6, base);
+  c.closePath();
+  g = c.createLinearGradient(0, yTop, 0, base);
+  g.addColorStop(0, '#E9EBEF'); g.addColorStop(0.45, '#A9AEB7'); g.addColorStop(1, '#6E737C');
+  c.fillStyle = g; c.fill();
+  // тёплый рефлекс от графика (тонирование в жёлтый)
+  c.save(); c.clip();
+  c.globalCompositeOperation = 'soft-light';
+  g = c.createLinearGradient(cx - fw / 2, 0, cx + fw / 2, 0);
+  g.addColorStop(0, `rgba(255,190,40,${0.2 + 0.5 * light})`); g.addColorStop(1, `rgba(255,170,20,${0.45 + 0.5 * light})`);
+  c.fillStyle = g; c.fillRect(cx - fw / 2, yTop - depth, fw, fh + depth);
+  c.globalCompositeOperation = 'source-over';
+  // бегущий блик
+  if (shine > 0 && shine < 1) {
+    const sx = lerp(cx - fw, cx + fw, shine);
+    g = c.createLinearGradient(sx - 50, 0, sx + 50, 0);
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,250,225,0.85)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g;
+    c.setTransform(1, 0, -0.5, 1, 0, 0);
+    c.fillRect(sx - 50 + base * 0.5 - 20, yTop - depth, 100, fh + depth);
+    c.setTransform(1, 0, 0, 1, 0, 0);
+  }
+  // гравировка
+  c.font = `600 13px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillStyle = 'rgba(40,40,46,0.45)';
+  c.fillText('SILVER  ·  999.9', cx, base - fh / 2 + 3);
+  c.fillStyle = 'rgba(255,255,255,0.35)';
+  c.fillText('SILVER  ·  999.9', cx, base - fh / 2 + 4);
+  c.restore();
+  // кант на ребре верха
+  c.strokeStyle = `rgba(255,236,170,${0.5 + 0.4 * light})`; c.lineWidth = 1.2;
+  c.beginPath(); c.moveTo(cx - ftw / 2, yTop + 0.5); c.lineTo(cx + ftw / 2, yTop + 0.5); c.stroke();
+}
+
+function drawBars(t, glow) {
+  const c = ctx;
+  // золотая линия пола
+  const fl = eOutQuint(prog(t, 0.4, 0.7));
+  if (fl > 0) {
+    const g = c.createLinearGradient(720 - 420, 0, 720 + 420, 0);
+    g.addColorStop(0, 'rgba(255,200,60,0)'); g.addColorStop(0.5, `rgba(255,214,110,${0.55 * fl})`); g.addColorStop(1, 'rgba(255,200,60,0)');
+    c.fillStyle = g; c.fillRect(720 - 420 * fl, 1033, 840 * fl, 1.5);
+  }
+  // пульс от ударов свечей
+  const pulse = CFG.big.reduce((m, b) => Math.max(m, Math.exp(-Math.max(0, t - (b.t0 + b.d * 0.55)) * 4) * (t > b.t0 + b.d * 0.55 ? 1 : 0)), 0);
+  BARS.forEach((b, k) => {
+    const p = prog(t, b.t0, 0.5);
+    if (p <= 0) return;
+    const e = eOutBack(p, 1.5);
+    const dy = (1 - e) * 70;
+    c.save();
+    c.globalAlpha = clamp(p * 3);
+    c.filter = p < 0.3 ? `blur(${(1 - p / 0.3) * 8}px)` : 'none';
+    c.translate(0, -dy);
+    const land = prog(t, b.t0 + 0.12, 0.55);
+    const fin = prog(t, CFG.finale + 0.05 + k * 0.07, 0.55);
+    const shine = fin > 0 ? fin : land;
+    drawBar(c, b.cx, b.base, clamp(0.25 * glow + 0.6 * pulse), shine, k);
+    c.restore();
+  });
+  // свечение над слитками в финале
+  const fin = eOutCubic(prog(t, CFG.finale, 0.4)) * Math.exp(-Math.max(0, t - CFG.finale - 0.3) * 1.5);
+  if (fin > 0) {
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const g = c.createRadialGradient(720, 980, 0, 720, 980, 300);
+    g.addColorStop(0, `rgba(255,210,90,${0.25 * fin})`); g.addColorStop(1, 'rgba(255,180,30,0)');
+    c.fillStyle = g; c.fillRect(420, 680, 600, 600);
+    c.restore();
+  }
+}
+
+function drawVignette() {
+  const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.95);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.65)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+
+function camera(t) {
+  // медленный наезд + тряска на ударах
+  let sx = 0, sy = 0;
+  CFG.big.forEach((b, k) => {
+    const age = t - (b.t0 + b.d * 0.55);
+    if (age < 0) return;
+    const amp = (3 + k * 2) * Math.exp(-age * 9);
+    sx += Math.sin(age * 83 + k) * amp; sy += Math.cos(age * 71 + k * 2) * amp;
+  });
+  const z = 1.035 - 0.035 * eOutCubic(prog(t, 0, 3.5)) + 0.012 * eOutCubic(prog(t, CFG.finale, 0.5));
+  return { z, sx, sy };
+}
+
+function drawScene(t) {
+  const c = ctx;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.filter = 'none'; c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+  const price = currentPrice(t);
+  const glow = clamp((price - CFG.price) / (CFG.big[2].c - CFG.price));
+  drawBackground(t, glow);
+  const cam = camera(t);
+  c.save();
+  c.translate(W / 2 + cam.sx, H / 2 + cam.sy); c.scale(cam.z, cam.z); c.translate(-W / 2, -H / 2);
+  const v = view(t);
+  const tagY = yOf(price, v);
+  drawGrid(t, v, tagY);
+  drawHistory(t, v);
+  drawBig(t, v);
+  drawSparks(t, v);
+  drawFlashes(t, v);
+  drawPriceLine(t, v);
+  drawBars(t, glow);
+  c.restore();
+  drawHeader(t);
+  drawVignette();
+}
+
+const FPS = 60, SUB = 4, SHUTTER = 0.5;
+window.renderFrame = (t) => {
+  // motion blur: усредняем SUB подкадров в пределах затвора 180°
+  out.globalCompositeOperation = 'source-over';
+  for (let k = 0; k < SUB; k++) {
+    drawScene(t + (k / SUB - 0.5) * SHUTTER / FPS);
+    out.globalAlpha = 1 / (k + 1);
+    out.drawImage(fb, 0, 0);
+  }
+  out.globalAlpha = 1;
+  // зерно
+  out.globalCompositeOperation = 'overlay';
+  out.globalAlpha = 0.07;
+  const r = rng(Math.floor(t * FPS) + 1);
+  out.drawImage(grain, -r() * 300, -r() * 300, 2048, 2048);
+  out.globalAlpha = 1; out.globalCompositeOperation = 'source-over';
+  // фейд из чёрного
+  const fi = 1 - eOutCubic(prog(t, 0, 0.18));
+  if (fi > 0) { out.fillStyle = `rgba(0,0,0,${fi})`; out.fillRect(0, 0, W, H); }
+};
+window.ready = document.fonts.load(`700 40px ${FONT}`).then(() => document.fonts.load(`500 20px ${FONT}`)).then(() => document.fonts.load(`600 13px ${FONT}`)).then(() => true);
+if (!navigator.webdriver) {
+  window.ready.then(() => {
+    const t0 = performance.now();
+    const loop = () => { const t = ((performance.now() - t0) / 1000) % 4.2; window.renderFrame(Math.min(t, 3.5)); requestAnimationFrame(loop); };
+    loop();
+  });
+}
+</script>
+</body>
+</html>
