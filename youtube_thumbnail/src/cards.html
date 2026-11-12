@@ -21,6 +21,7 @@ body{font-family:"ID",sans-serif;position:relative;-webkit-font-smoothing:antial
 .pillR{left:1097px;top:83px;width:517px;height:124px;background:linear-gradient(180deg,#ffffff,#f4f4f4);
   box-shadow:0 10px 30px rgba(0,0,0,.35)}
 .pillR .t{color:#0b0b0b}
+.plogo{flex:none;width:76px;height:76px;border-radius:18px;margin-left:-6px;box-shadow:0 3px 10px rgba(0,0,0,.25)}
 .tog{flex:none;width:100px;height:56px;border-radius:28px;position:relative}
 .tog i{position:absolute;top:7px;width:42px;height:42px;border-radius:50%;background:#fff}
 .togL{background:linear-gradient(180deg,#ff3b3b,#e01414);box-shadow:0 0 26px 6px rgba(255,30,30,.75),0 0 60px 14px rgba(255,20,20,.35)}
@@ -59,57 +60,57 @@ body{font-family:"ID",sans-serif;position:relative;-webkit-font-smoothing:antial
 
 /* right card */
 .allof{position:absolute;left:32px;top:16px;font-size:44px;font-weight:600;color:#111;letter-spacing:-0.01em}
-.zero{position:absolute;left:44px;top:74px;display:flex;align-items:center;gap:12px}
-.zero .num{font-weight:900;font-size:192px;line-height:1;letter-spacing:-0.04em;color:#050505;position:relative;
+.zero{position:absolute;left:150px;top:76px;display:flex;align-items:center;gap:10px}
+.zero .num{font-weight:900;font-size:200px;line-height:1;letter-spacing:-0.04em;color:#050505;position:relative;
   text-shadow:0 0 30px rgba(40,220,90,.55),0 0 70px rgba(40,220,90,.35)}
-.glow{position:absolute;left:-10px;top:50px;width:330px;height:250px;border-radius:50%;
+.glow{position:absolute;left:110px;top:50px;width:330px;height:250px;border-radius:50%;
   background:radial-gradient(closest-side,rgba(60,235,110,.55),rgba(60,235,110,0))}
-.free{background:linear-gradient(180deg,#2fd864,#14b545);color:#fff;font-weight:900;font-size:50px;letter-spacing:.01em;
-  padding:10px 20px 12px;border-radius:18px;line-height:1;box-shadow:0 0 26px rgba(30,210,90,.6);transform:rotate(-4deg)}
+.free{position:absolute;right:24px;top:30px;background:linear-gradient(180deg,#2fd864,#14b545);color:#fff;font-weight:900;font-size:38px;letter-spacing:.01em;
+  padding:10px 14px 11px;border-radius:14px;line-height:1;box-shadow:0 0 26px rgba(30,210,90,.6);transform:rotate(-4deg)}
 .icons{position:absolute;right:30px;top:316px;display:flex;gap:16px}
 .icons .ico{width:72px;height:72px;border-radius:18px;position:relative;overflow:visible}
 .icons .ico img{border-radius:17px}
 .icons .ck{position:absolute;right:-10px;bottom:-10px;width:32px;height:32px;border-radius:50%;background:#16c04b;
   border:3px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.25)}
-.btn{position:absolute;right:28px;top:420px;width:330px;height:68px;border-radius:16px;
-  background:linear-gradient(180deg,#3bd35a,#21b33f);color:#fff;font-weight:800;font-size:38px;letter-spacing:-0.01em;
+.btn{position:absolute;right:26px;top:420px;width:348px;height:68px;border-radius:16px;
+  background:linear-gradient(180deg,#3bd35a,#21b33f);color:#fff;font-weight:800;font-size:33px;letter-spacing:-0.015em;white-space:nowrap;
   display:flex;align-items:center;justify-content:center;gap:12px;box-shadow:0 6px 18px rgba(20,160,60,.35),inset 0 1px 0 rgba(255,255,255,.3)}
 </style></head>
 <body>
 
 <!-- LEFT PILL -->
-<div class="abs pill pillL"><div class="t fit" data-max="64">Paid services</div><div class="tog togL"><i></i></div></div>
+<div class="abs pill pillL"><div class="t fit" data-max="64">Платные сервисы</div><div class="tog togL"><i></i></div></div>
 <!-- RIGHT PILL -->
-<div class="abs pill pillR"><div class="t fit" data-max="64">blofin.perpetuas.io</div><div class="tog togR"><i></i></div></div>
+<div class="abs pill pillR"><img class="plogo" src="icons/perpetuas.svg"><div class="t fit" data-max="64">Perpetuas</div><div class="tog togR"><i></i></div></div>
 
 <!-- LEFT CARD -->
 <div class="abs card cardL">
   <div class="list">
-    <div class="row"><div class="ico" style="background:#131722"><img src="icons/tradingview_tile.svg"></div><div class="name">TradingView</div><div class="price">$60<small>/mo</small></div></div>
-    <div class="row"><div class="ico" style="background:#eb9b3b"><img src="icons/tokenomist.png"></div><div class="name">Tokenomist</div><div class="price">$69<small>/mo</small></div></div>
-    <div class="row"><div class="ico" style="background:#5f6ae5"><img src="icons/defillama.png"></div><div class="name">DefiLlama</div><div class="price">$41<small>/mo</small></div></div>
-    <div class="row"><div class="ico" style="background:#1b1a1a"><img src="icons/coinglass.png"></div><div class="name">CoinGlass</div><div class="price"><span class="from">from</span>$23<small>/mo</small></div></div>
+    <div class="row"><div class="ico" style="background:#131722"><img src="icons/tradingview_tile.svg"></div><div class="name">TradingView</div><div class="price">$60<small>/мес</small></div></div>
+    <div class="row"><div class="ico" style="background:#eb9b3b"><img src="icons/tokenomist.png"></div><div class="name">Tokenomist</div><div class="price">$69<small>/мес</small></div></div>
+    <div class="row"><div class="ico" style="background:#5f6ae5"><img src="icons/defillama.png"></div><div class="name">DefiLlama</div><div class="price">$41<small>/мес</small></div></div>
+    <div class="row"><div class="ico" style="background:#1b1a1a"><img src="icons/coinglass.png"></div><div class="name">CoinGlass</div><div class="price"><span class="from">от</span>$23<small>/мес</small></div></div>
   </div>
   <div class="total">
     <div class="l1">
       <svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 4v14M5 12l7 7 7-7" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      TOTAL</div>
-    <div class="l2">≈ $2,300<small> / year</small></div>
+      ИТОГО</div>
+    <div class="l2">≈ $2 300<small> / год</small></div>
   </div>
 </div>
 
 <!-- RIGHT CARD -->
 <div class="abs card cardR">
   <div class="glow"></div>
-  <div class="allof">All of this</div>
-  <div class="zero"><div class="num">$0</div><div class="free">FREE</div></div>
+  <div class="allof">Всё это</div>
+  <div class="zero"><div class="num">$0</div></div><div class="free">БЕСПЛАТНО</div>
   <div class="icons">
     <div class="ico" style="background:#131722"><img src="icons/tradingview_tile.svg"><div class="ck"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
     <div class="ico" style="background:#eb9b3b"><img src="icons/tokenomist.png"><div class="ck"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
     <div class="ico" style="background:#5f6ae5"><img src="icons/defillama.png"><div class="ck"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
     <div class="ico" style="background:#1b1a1a"><img src="icons/coinglass.png"><div class="ck"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
   </div>
-  <div class="btn">Included free</div>
+  <div class="btn">Включено бесплатно</div>
 </div>
 
 <script>
