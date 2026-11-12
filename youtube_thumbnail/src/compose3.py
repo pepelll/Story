@@ -1,0 +1,11 @@
+from PIL import Image, ImageFilter
+base=Image.open('v_tat.png').convert('RGBA')
+cards=Image.open('cards.png').convert('RGBA')
+person=Image.open('person_v_tat.png').convert('RGBA')
+a=person.getchannel('A').filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.7))
+person.putalpha(a)
+out=base.copy(); out.alpha_composite(cards); out.alpha_composite(person)
+out=out.convert('RGB'); out.save('thumbnail_v3.png')
+out.resize((1280,720),Image.LANCZOS).save('p3_1280.png')
+out.resize((320,180),Image.LANCZOS).save('p3_320.png')
+out.crop((1090,230,1625,770)).save('p3_right.png')
