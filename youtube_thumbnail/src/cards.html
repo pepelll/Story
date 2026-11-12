@@ -38,24 +38,24 @@ body{font-family:"ID",sans-serif;position:relative;-webkit-font-smoothing:antial
   background:linear-gradient(180deg,#ffffff 0%,#f6fbf6 30%,#d9f3dc 70%,#b4e6bb 100%);
   box-shadow:0 0 34px rgba(80,230,120,.25),0 18px 40px rgba(0,0,0,.45)}
 
-/* left list */
-.list{position:absolute;left:22px;top:24px;width:418px}
-.row{display:flex;align-items:center;height:80px;gap:14px;border-bottom:2px solid rgba(255,255,255,.22)}
-.row:last-child{border-bottom:none}
-.ico{flex:none;width:60px;height:60px;border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center;
-  box-shadow:0 3px 10px rgba(0,0,0,.35)}
+/* left grid */
+.ico{flex:none;width:60px;height:60px;border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.35)}
 .ico img{width:100%;height:100%;display:block}
-.name{color:#fff;font-weight:800;font-size:33px;letter-spacing:-0.02em;flex:1;white-space:nowrap}
-.price{color:#fff;font-weight:800;font-size:34px;letter-spacing:-0.02em;white-space:nowrap;text-align:right}
-.price small{font-size:26px;font-weight:700;color:rgba(255,255,255,.85);letter-spacing:0}
-.price .from{font-size:25px;font-weight:700;color:rgba(255,255,255,.85);margin-right:5px}
-
-.total{position:absolute;left:24px;top:376px;width:372px;height:110px;border-radius:22px;
+.grid{position:absolute;left:18px;top:20px;width:424px;display:grid;grid-template-columns:205px 205px;gap:14px}
+.tile{height:140px;border-radius:20px;background:rgba(0,0,0,.18);border:2px solid rgba(255,255,255,.16);padding:14px 10px 0 12px;position:relative;overflow:hidden}
+.tile .pr{display:inline-block;width:max-content}
+.tile .hd{display:flex;align-items:center;gap:10px}
+.tile .ico{width:50px;height:50px;border-radius:13px}
+.tile .nm{color:rgba(255,255,255,.88);font-weight:700;font-size:21px;letter-spacing:-0.01em;white-space:nowrap}
+.tile .pr{color:#fff;font-weight:900;font-size:66px;letter-spacing:-0.04em;line-height:1;margin-top:8px;white-space:nowrap}
+.tile .pr small{font-size:20px;font-weight:800;letter-spacing:-0.01em;color:rgba(255,255,255,.9)}
+.tile .pr .from{font-size:21px;font-weight:800;letter-spacing:-0.01em;margin-right:2px}
+.total{position:absolute;left:18px;top:330px;width:370px;height:150px;border-radius:22px;
   background:linear-gradient(180deg,#ff2d2d,#d81111);
   box-shadow:0 0 28px rgba(255,30,30,.55),inset 0 1px 0 rgba(255,255,255,.25);
   display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding:0 20px;color:#fff}
-.total .l1{font-weight:800;font-size:29px;letter-spacing:.06em;opacity:.92;display:flex;align-items:center;gap:8px}
-.total .l2{font-weight:900;font-size:52px;letter-spacing:-0.03em;line-height:1;margin-top:4px;white-space:nowrap}
+.total .l1{font-weight:800;font-size:30px;letter-spacing:.06em;display:flex;align-items:center;gap:8px}
+.total .l2{font-weight:900;font-size:66px;letter-spacing:-0.04em;line-height:1;margin-top:6px;white-space:nowrap}
 .total .l2 small{font-size:30px;font-weight:800;letter-spacing:-0.01em}
 
 /* right card */
@@ -73,7 +73,7 @@ body{font-family:"ID",sans-serif;position:relative;-webkit-font-smoothing:antial
 .icons .ck{position:absolute;right:-10px;bottom:-10px;width:32px;height:32px;border-radius:50%;background:#16c04b;
   border:3px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.25)}
 .btn{position:absolute;right:30px;top:422px;width:336px;height:66px;border-radius:16px;
-  background:linear-gradient(180deg,#22d14f,#0aa834);color:#fff;font-weight:800;font-size:30px;letter-spacing:0;white-space:nowrap;
+  background:linear-gradient(180deg,#22d14f,#0aa834);color:#fff;font-weight:800;font-size:32px;letter-spacing:-0.01em;white-space:nowrap;
   display:flex;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(10,170,50,.45),0 0 22px rgba(30,210,80,.35),inset 0 1px 0 rgba(255,255,255,.3)}
 </style></head>
 <body>
@@ -85,12 +85,12 @@ body{font-family:"ID",sans-serif;position:relative;-webkit-font-smoothing:antial
 
 <!-- LEFT CARD -->
 <div class="abs card cardL">
-  <div class="list">
-    <div class="row"><div class="ico" style="background:#131722"><img src="icons/tradingview_tile.svg"></div><div class="name">TradingView</div><div class="price">$60<small>/мес</small></div></div>
-    <div class="row"><div class="ico" style="background:#eb9b3b"><img src="icons/tokenomist.png"></div><div class="name">Tokenomist</div><div class="price">$69<small>/мес</small></div></div>
-    <div class="row"><div class="ico" style="background:#5f6ae5"><img src="icons/defillama.png"></div><div class="name">DefiLlama</div><div class="price">$41<small>/мес</small></div></div>
-    <div class="row"><div class="ico" style="background:#1b1a1a"><img src="icons/coinglass.png"></div><div class="name">CoinGlass</div><div class="price"><span class="from">от</span>$23<small>/мес</small></div></div>
-  </div>
+  <div class="grid">
+<div class="tile"><div class="hd"><div class="ico" style="background:#131722"><img src="icons/tradingview_tile.svg"></div><div class="nm">TradingView</div></div><div class="pr">$60<small>/мес</small></div></div>
+<div class="tile"><div class="hd"><div class="ico" style="background:#eb9b3b"><img src="icons/tokenomist.png"></div><div class="nm">Tokenomist</div></div><div class="pr">$69<small>/мес</small></div></div>
+<div class="tile"><div class="hd"><div class="ico" style="background:#5f6ae5"><img src="icons/defillama.png"></div><div class="nm">DefiLlama</div></div><div class="pr">$41<small>/мес</small></div></div>
+<div class="tile"><div class="hd"><div class="ico" style="background:#1b1a1a"><img src="icons/coinglass.png"></div><div class="nm">CoinGlass</div></div><div class="pr"><span class="from">от</span>$23<small>/мес</small></div></div>
+</div>
   <div class="total">
     <div class="l1">
       <svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 4v14M5 12l7 7 7-7" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -119,5 +119,10 @@ document.querySelectorAll('.fit').forEach(el=>{
   while(el.scrollWidth>el.clientWidth && s>20){s-=1;el.style.fontSize=s+'px'}
   el.dataset.final=s;
 });
+
+document.fonts.ready.then(function(){const prs=[...document.querySelectorAll('.tile .pr')];let f=66;
+ const fits=()=>prs.every(p=>p.getBoundingClientRect().width<=p.parentElement.clientWidth-22);
+ while(!fits()&&f>40){f--;prs.forEach(p=>p.style.fontSize=f+'px')}
+ document.body.dataset.pr=f;});
 </script>
 </body></html>
