@@ -1,0 +1,11 @@
+from PIL import Image, ImageFilter
+bg=Image.open('thumbnail.png').convert('RGBA')
+cards=Image.open('cards.png').convert('RGBA')
+person=Image.open('person_tat.png').convert('RGBA')
+a=person.getchannel('A').filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.7))
+person.putalpha(a)
+out=bg.copy(); out.alpha_composite(cards); out.alpha_composite(person)
+out=out.convert('RGB'); out.save('thumbnail_tattoo.png')
+out.resize((1280,720),Image.LANCZOS).save('preview_tattoo_1280.png')
+out.resize((320,180),Image.LANCZOS).save('preview_tattoo_320.png')
+out.crop((380,380,1300,941)).save('tattoo_zoom.jpg')
